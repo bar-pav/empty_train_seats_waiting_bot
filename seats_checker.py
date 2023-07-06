@@ -16,16 +16,16 @@ route = ('Витебск', 'Минск-Пассажирский')
 # --------------------------------------------------------------
 # departure_date = None
 departure_date = {
-    'day': '01',
-    'month': '01',
-    'year': '2024'
+    'day': '16',
+    'month': '07',
+    'year': '2023'
 }
-
-
+    
 if isinstance(departure_date, dict):
-    date = f"{departure_date['year']}-{departure_date['month']}-{departure_date['day']}"
+    departure_date = f"{departure_date['year']}-{departure_date['month']}-{departure_date['day']}"
 else:
-    date = input("Enter departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
+    departure_date = input("Enter departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
+
 
 print(f"Enter departure station (1 - Vitebsk) (2 - Minsk):")
 dep = input("\tStation: ")
@@ -35,7 +35,9 @@ else:
     route_from, route_to = route[::-1]
 
 telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
-rw_url = f"https://pass.rw.by/ru/route/?from={route_from}&to={route_to}&date={date}"
+
+def get_rw_url_for_date(date):
+    return f"https://pass.rw.by/ru/route/?from={route_from}&to={route_to}&date={date}"
 
 
 def send_msg(text):
@@ -44,7 +46,7 @@ def send_msg(text):
     print(result.json())
 
 
-def get_list_of_trains():
+def get_list_of_trains(rw_url):
     try:
         response = requests.get(rw_url)
         page = bs(response.text, features="html.parser")
@@ -61,8 +63,8 @@ def get_list_of_trains():
                     trains_list.append(train)
             return trains_list
     except:
-        print('Exception while getting list of trains.')
-
+        print(f"Exception while getting list of trains on date {departure_date} for route '{route_from} - {route_to}'.")
+        return
 
 def print_list_of_trains(trains):
     print('Select train:')
@@ -71,7 +73,7 @@ def print_list_of_trains(trains):
             print(f"\t{i}) '{train[0]}' : {train[1]} - {train[2]}")
 
 
-def get_seats_info(data_train_number):
+def get_seats_info(data_train_number, rw_url):
     try:
         response = requests.get(rw_url)
         page = bs(response.text, features="html.parser")
@@ -105,8 +107,13 @@ def test_get_updates_from_bot():
     print(result.json())
 
 
-def main_loop():
-    trains = get_list_of_trains()
+def main_loop(departure_date):
+    trains = None
+    while trains is None:
+        rw_url = get_rw_url_for_date(departure_date)
+        trains = get_list_of_trains(rw_url)
+        if trains is None:
+            departure_date = input("Enter another departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
     print_list_of_trains(trains)
     if trains:
         number = int(input(f"Select train number. Enter 1 - {len(trains)}:  "))
@@ -115,11 +122,11 @@ def main_loop():
         print('No trains on selected date.')
         return
     while True:
-        print(datetime.now().strftime('%d.%m %H:%M:%S'), end=' ')
+        print(datetime.now().strftime('%d.%m %H:%M:%S'), end=': ')
         print(f"'{trains[number - 1][3]}'", end=" ")
-        print(f"Train '{train_number}': {departure_date['day']}/{departure_date['month']}/{departure_date['year']},", end=' ')
-        get_seats_info(train_number)
+        print(f"Train '{train_number}': {departure_date},", end=' ')
+        get_seats_info(train_number, rw_url)
         time.sleep(10)
 
 
-main_loop()
+main_loop(departure_date)
