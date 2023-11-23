@@ -107,13 +107,15 @@ def get_rw_url(from_, to_, date):
     return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
-from datetime import datetime
-
-
 def parse_response(response):
+    empty_seats_count = 0
     trains = {}
     page = bs(response.text, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
+    # train_table = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
+    # print(train_table)
+    # train_blocks = train_table.find_all('div', recursive=False)
+    trains['trains'] = {}
     for train_block in train_blocks:
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
@@ -122,32 +124,28 @@ def parse_response(response):
         train_to_time = train_block.find('div', attrs={'class': 'sch-table__time train-to-time'}).text.strip()
         train_duration_time = train_block.find('div', attrs={'class': 'sch-table__duration train-duration-time'}).text.strip()
         train_info['route'] = train_route
-        train_info['time'] = f'{train_from_time} - {train_to_time} ({train_duration_time})'
+        train_info['time'] = (train_from_time, train_to_time, train_duration_time)
         tickets = []
 
         no_tickets = train_block.find('div', attrs={'class': 'sch-table__no-info'})
         if no_tickets:
-            print("NO tickets")
             tickets = no_tickets.text.strip()
+
         tickets_block = train_block.find('div', attrs={'class': 'sch-table__cell cell-4'})
-
-        # print(tickets_block)
         if tickets_block:
-
-
             ticket_quants = tickets_block.find_all('div', attrs={'class': "sch-table__t-item has-quant"})
-            print('Quants:', type(ticket_quants))
             for ticket_info in ticket_quants:
-                # print(tickets_block)
-                print("TIcket info: ", ticket_info)
                 ticket_name = ticket_info.find('div', attrs={'class': "sch-table__t-name"}).text.strip()
                 ticket_quant = ticket_info.find('a', attrs={'class': "sch-table__t-quant"}).find('span').text.strip()
+                empty_seats_count += int(ticket_quant)
                 ticket_cost = ticket_info.find('span', attrs={'class': "ticket-cost"}).text.strip()
                 tickets.append((ticket_name, ticket_quant, ticket_cost))
             train_info['tickets'] = tickets
 
         if train_number:
-            trains[train_number] = train_info
+            trains['trains'][train_number] = train_info
+    trains['empty_seats_count'] = empty_seats_count
+
     return trains
 
 
@@ -204,10 +202,8 @@ def test_request():
     url = get_rw_url('Минск', 'Витебск', '2023-11-24')
     trains = get_trains(url)
     print(trains)
-    # for train in trains:
-    #     print(train)
-
-    print('Len = ', len(trains))
+    print(trains['empty_seats_count'])
+    print('Количество поездов = ', len(trains['trains']))
 
 
 test_request()
