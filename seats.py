@@ -2,6 +2,7 @@ from datetime import datetime
 import time
 from bs4 import BeautifulSoup as bs
 import requests
+from copy import deepcopy
 
 from config_setup import config
 
@@ -107,16 +108,31 @@ def get_rw_url(from_, to_, date):
     return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
+def check_attribute(tag):
+    if 'data-train-info' in tag.attrs:
+        return True
+
+
 def parse_response(response):
+    """
+
+    :param response:
+    :return: dict 'trains' with keys:
+        'trains',
+        'empty_seats_count',
+    """
     empty_seats_count = 0
     trains = {}
     page = bs(response.text, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
     # train_table = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
-    # print(train_table)
     # train_blocks = train_table.find_all('div', recursive=False)
+    # train_blocks = filter(check_attribute, train_blocks)
     trains['trains'] = {}
+    b = 0
     for train_block in train_blocks:
+        # print(type(train_block))
+        b += 1
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
         train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
@@ -126,73 +142,77 @@ def parse_response(response):
         train_info['route'] = train_route
         train_info['time'] = (train_from_time, train_to_time, train_duration_time)
         tickets = []
-
-        no_tickets = train_block.find('div', attrs={'class': 'sch-table__no-info'})
-        if no_tickets:
-            tickets = no_tickets.text.strip()
-
         tickets_block = train_block.find('div', attrs={'class': 'sch-table__cell cell-4'})
         if tickets_block:
+            # print(b)
             ticket_quants = tickets_block.find_all('div', attrs={'class': "sch-table__t-item has-quant"})
             for ticket_info in ticket_quants:
+                # print('    Ticket quant in ticket block', b)
                 ticket_name = ticket_info.find('div', attrs={'class': "sch-table__t-name"}).text.strip()
                 ticket_quant = ticket_info.find('a', attrs={'class': "sch-table__t-quant"}).find('span').text.strip()
                 empty_seats_count += int(ticket_quant)
                 ticket_cost = ticket_info.find('span', attrs={'class': "ticket-cost"}).text.strip()
                 tickets.append((ticket_name, ticket_quant, ticket_cost))
-            train_info['tickets'] = tickets
+        train_info['tickets'] = tickets
 
         if train_number:
             trains['trains'][train_number] = train_info
     trains['empty_seats_count'] = empty_seats_count
-
     return trains
 
 
-def get_trains(rw_url):
-    s = datetime.now()
+def get_webpage(rw_url):
+    start_response = datetime.now()
     response = requests.get(rw_url)
-    er = datetime.now()
+    end_response = datetime.now()
     if response.status_code == 200:
         trains = parse_response(response)
-        ep = datetime.now()
-        print("Response spent time:", er - s, 's')
-        print("Parse spent time:", ep - er, 's')
-
+        end_parse = datetime.now()
+        print("Full time:", end_parse - start_response, 's')
+        print("\tResponse time:", end_response - start_response, 's')
+        print("\tParse time:", end_parse - end_response, 's')
         return trains
-        # trains_list = []
-        # train_blocks = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
-        # for i in train_blocks.findChildren('div', recursive=False):
-        #     train = []
-        #     if 'data-train-info' in i.attrs:
-        #         train.append(i.findChild('div')['data-train-number'])
-        #         train.append(i.find('div', attrs={'data-sort': 'departure'}).text.strip())
-        #         train.append(i.find('div', attrs={'data-sort': 'arrival'}).text.strip())
-        #         train.append(i.find('span', attrs={'class': 'train-route'}).text.strip())
-        #         trains_list.append(train)
-        # return trains_list
 
 
-def main_loop(departure_station, arrival_station, departure_date):
-    trains = None
-    while trains is None:
-        rw_url = get_rw_url(departure_station, arrival_station, departure_date)
-        trains = get_list_of_trains(rw_url)
-        if trains is None:
-            departure_date = input("Enter another departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
-    print_list_of_trains(trains)
-    if trains:
-        number = int(input(f"Select train number. Enter 1 - {len(trains)}:  "))
-        train_number = trains[number - 1][0]
-    else:
-        print('No trains on selected date.')
-        return
-    while True:
-        print(datetime.now().strftime('%d.%m %H:%M:%S'), end=': ')
-        print(f"'{trains[number - 1][3]}'", end=" ")
-        print(f"Train '{train_number}': {departure_date},", end=' ')
-        get_seats_info(train_number, rw_url)
-        time.sleep(10)
+def show_trains(trains):
+    return [(k, v['time'][0], v['time'][2]) for k, v in trains['trains'].items()]
+
+
+def find_tickets(trains, train=None, departure_time=None, tickets_count=None):
+    if not departure_time and not tickets_count and not train:
+        for train in trains['trains']:
+            pass
+        return trains['empty_seats_count']
+
+
+def train_filter(trains, key):
+    train_copy = deepcopy(trains)
+    for k, v in train_copy[trains].items():
+        pass
+    # must return same dict after filtration.
+    return
+
+
+# def main_loop(departure_station, arrival_station, departure_date):
+#     trains = None
+#     while trains is None:
+#         rw_url = get_rw_url(departure_station, arrival_station, departure_date)
+#         trains = get_list_of_trains(rw_url)
+#         if trains is None:
+#             departure_date = input("Enter another departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
+#     print_list_of_trains(trains)
+#     if trains:
+#         number = int(input(f"Select train number. Enter 1 - {len(trains)}:  "))
+#         train_number = trains[number - 1][0]
+#     else:
+#         print('No trains on selected date.')
+#         return
+#     while True:
+#         print(datetime.now().strftime('%d.%m %H:%M:%S'), end=': ')
+#         print(f"'{trains[number - 1][3]}'", end=" ")
+#         print(f"Train '{train_number}': {departure_date},", end=' ')
+#         get_seats_info(train_number, rw_url)
+#         time.sleep(10)
 
 
 # main_loop(departure_station, arrival_station, departure_date)
@@ -200,10 +220,12 @@ def main_loop(departure_station, arrival_station, departure_date):
 
 def test_request():
     url = get_rw_url('Минск', 'Витебск', '2023-11-24')
-    trains = get_trains(url)
+    trains = get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
     print('Количество поездов = ', len(trains['trains']))
+    print('find_tickets:', find_tickets(trains))
+    print('show_trains', show_trains(trains))
 
 
 test_request()
