@@ -118,8 +118,15 @@ def parse_response(response):
 
     :param response:
     :return: dict 'trains' with keys:
-        'trains',
-        'empty_seats_count',
+        {
+            'trains':
+                {
+                    'route': str,
+                    'time': ('departure', 'arrival', 'duration'),
+                    'tickets': [('name', 'quantity', 'cost'), (...)],
+                },
+            'empty_seats_count': int,
+        }
     """
     empty_seats_count = 0
     trains = {}
@@ -154,7 +161,6 @@ def parse_response(response):
                 ticket_cost = ticket_info.find('span', attrs={'class': "ticket-cost"}).text.strip()
                 tickets.append((ticket_name, ticket_quant, ticket_cost))
         train_info['tickets'] = tickets
-
         if train_number:
             trains['trains'][train_number] = train_info
     trains['empty_seats_count'] = empty_seats_count
@@ -176,6 +182,14 @@ def get_webpage(rw_url):
 
 def show_trains(trains):
     return [(k, v['time'][0], v['time'][2]) for k, v in trains['trains'].items()]
+
+
+def show_brief_info(trains):
+    for train, train_info in trains['trains']:
+        tickets_count = '\n'.join([f'{tickets[1]} за {tickets[2]}' for tickets in train_info['tickets']])
+
+        print(f'{train} ({train_info["rout"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:'
+              f'{tickets_count}')
 
 
 def query_tickets(trains, train_number=None, tickets_count=None):
@@ -209,9 +223,10 @@ def find_tickets(departure_station, arrival_station, departure_date, train_numbe
     url = get_rw_url(departure_station, arrival_station, departure_date)
     trains = get_webpage(url)
     result = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
-    print(f'Result on {departure_date}:', result)
+    print(f'Result. Tickets for date {departure_date}:', result)
 
 
+# TODO
 def train_filter(trains, /, key):
     train_copy = deepcopy(trains)
     for k, v in train_copy[trains].items():
@@ -222,34 +237,17 @@ def train_filter(trains, /, key):
 
 def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
     trains = None
-    # while trains is None:
-    #     rw_url = get_rw_url(departure_station, arrival_station, departure_date)
-    #     trains = get_list_of_trains(rw_url)
-    #     if trains is None:
-    #         departure_date = input("Enter another departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
-    # print_list_of_trains(trains)
-    # if trains:
-    #     number = int(input(f"Select train number. Enter 1 - {len(trains)}:  "))
-    #     train_number = trains[number - 1][0]
-    # else:
-    #     print('No trains on selected date.')
-    #     return
     while True:
-        # print(datetime.now().strftime('%d.%m %H:%M:%S'), end=': ')
-        # print(f"'{trains[number - 1][3]}'", end=" ")
-        # print(f"Train '{train_number}': {departure_date},", end=' ')
-        # get_seats_info(train_number, rw_url)
-        # time.sleep(10)
-        with open('departure_time.txt', 'rt') as f:
-            t = f.read().strip()
-        if t:
-            departure_date = t
+        with open('departure_date.txt', 'rt') as f:
+            dep_date_from_file = f.read().strip()
+        if dep_date_from_file:
+            departure_date = dep_date_from_file
         find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
         time.sleep(10)
 
 
 def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-11-26')
+    url = get_rw_url('Минск', 'Витебск', '2023-11-28')
     trains = get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
@@ -258,5 +256,5 @@ def test_request():
     print('show_trains', show_trains(trains))
 
 
-# test_request()
-main_loop('Минск', 'Витебск', '2023-11-26')
+test_request()
+# main_loop('Минск', 'Витебск', '2023-11-26')
