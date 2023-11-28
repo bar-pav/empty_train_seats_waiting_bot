@@ -3,6 +3,9 @@ import time
 from bs4 import BeautifulSoup as bs
 import requests
 
+import asyncio
+import aiohttp
+
 from config_setup import config
 
 telegram_token = config['TELEGRAM_TOKEN']
@@ -192,4 +195,23 @@ def test_request():
 
 
 # test_request()
-main_loop('Минск', 'Витебск', '2023-11-26')
+# main_loop('Минск', 'Витебск', '2023-11-26')
+
+async def coro(t):
+    print('    Coro sleep')
+    await asyncio.sleep(t)
+
+
+async def main():
+    task1 = asyncio.create_task(coro(2))
+    task2 = asyncio.create_task(coro(1))
+    while True:
+        await task1
+        await task2
+        print('Cycle before sleep')
+        await asyncio.sleep(3)
+        print('Cycle after sleep')
+        await asyncio.sleep(1)
+
+
+asyncio.run(main())
