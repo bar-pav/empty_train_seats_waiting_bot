@@ -89,7 +89,7 @@ def parse_response(response):
     """
     empty_seats_count = 0
     trains = {}
-    page = bs(response.text, features="html.parser")
+    page = bs(response, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
     # train_table = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
     # train_blocks = train_table.find_all('div', recursive=False)
@@ -126,7 +126,7 @@ def get_webpage(rw_url):
     response = requests.get(rw_url)
     end_response = datetime.now()
     if response.status_code == 200:
-        trains = parse_response(response)
+        trains = parse_response(response.text)
         end_parse = datetime.now()
         print("Full time:", end_parse - start_response, 's')
         print("\tResponse time:", end_response - start_response, 's')
@@ -182,7 +182,7 @@ def main_loop(departure_station, arrival_station, departure_date, train_number=N
 
 
 def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-11-28')
+    url = get_rw_url('Минск', 'Витебск', '2023-11-29')
     trains = get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
@@ -191,5 +191,5 @@ def test_request():
     # print('show_trains', show_trains(trains))
 
 
-# test_request()
-main_loop('Минск', 'Витебск', '2023-11-26')
+test_request()
+# main_loop('Минск', 'Витебск', '2023-11-26')
