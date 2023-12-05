@@ -127,8 +127,8 @@ def parse_response(response):
 def show_brief_info(trains):
     for train, train_info in trains.items():
         tickets_count = '\n\t\t'.join([f'{tickets[1]} за {tickets[2]}' for tickets in train_info['tickets']])
-        print(f'{train} ({train_info["route"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:\n\t\t'
-              f'{tickets_count}')
+        return (f'{train} ({train_info["route"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:\n\t\t '
+                f'{tickets_count}')
 
 
 def has_tickets(tickets_count):
@@ -176,21 +176,22 @@ async def find_tickets(departure_station, arrival_station, departure_date, train
 
 def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
     while True:
-        with open('departure_date.txt', 'rt') as f:
-            dep_date_from_file = f.read().strip()
-        if dep_date_from_file:
-            departure_date = dep_date_from_file
+        # with open('departure_date.txt', 'rt') as f:
+        #     dep_date_from_file = f.read().strip()
+        # if dep_date_from_file:
+        #     departure_date = dep_date_from_file
         find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
         time.sleep(10)
 
 
 async def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-11-29')
+    url = get_rw_url('Минск', 'Витебск', '2023-12-10')
     trains = await get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
     print('Количество поездов = ', len(trains['trains']))
-    print('found_tickets:', show_brief_info(query_tickets(trains, train_number=None, tickets_count=2)))
+    print('found_tickets:', show_brief_info(query_tickets(trains, train_number=None, tickets_count=None)))
+    # return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
     # print('show_trains', show_trains(trains))
 
 
