@@ -125,10 +125,12 @@ def parse_response(response):
 
 
 def show_brief_info(trains):
+    res = ''
     for train, train_info in trains.items():
         tickets_count = '\n\t\t'.join([f'{tickets[1]} за {tickets[2]}' for tickets in train_info['tickets']])
-        return (f'{train} ({train_info["route"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:\n\t\t '
-                f'{tickets_count}')
+        res += (f'{train} ({train_info["route"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:\n\t\t '
+                f'{tickets_count}') + '\n'
+    return res
 
 
 def has_tickets(tickets_count):
@@ -190,8 +192,11 @@ async def test_request():
     print(trains)
     print(trains['empty_seats_count'])
     print('Количество поездов = ', len(trains['trains']))
-    print('found_tickets:', show_brief_info(query_tickets(trains, train_number=None, tickets_count=None)))
-    # return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
+    print('found_tickets:')
+    t = query_tickets(trains, train_number=None, tickets_count=None)
+    print(t)
+    print(show_brief_info(t))
+    return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
     # print('show_trains', show_trains(trains))
 
 

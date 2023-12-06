@@ -12,7 +12,6 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("Ну, подожди ты!")
     res = await test_request()
     await message.answer(res)
 
