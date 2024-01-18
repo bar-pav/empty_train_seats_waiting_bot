@@ -12,46 +12,10 @@ telegram_token = config['TELEGRAM_TOKEN']
 my_telegram_id = config['my_telegram_id']
 
 
-def get_departure_station():
-    return input("Введите станцию отправления.").strip()
-
-
-def get_arrival_station():
-    return input("Введите станцию назначения.").strip()
-
-
-route = ('Витебск', 'Минск-Пассажирский')
-# departure_station = get_departure_station()
-# arrival_station = get_arrival_station()
-
-
 # --------------------------------------------------------------
-
-
-def get_departure_date():
-    return input("Введите дату отправления в формате dd.mm.yyyy.").strip()
-
-
-# departure_date = get_departure_date().split('.')
-# departure_date = {
-#     'day': departure_date[0],
-#     'month': departure_date[1],
-#     'year': departure_date[2]
-# }
-#
-# if isinstance(departure_date, dict):
-#     departure_date = f"{departure_date['year']}-{departure_date['month']}-{departure_date['day']}"
-# else:
-#     departure_date = input("Enter departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
-
-# print(f"Enter departure station (1 - Vitebsk) (2 - Minsk):")
-# dep = input("\tStation: ")
-# if dep == '1' or dep == 'Vitebsk':
-#     route_from, route_to = route
-# else:
-#     route_from, route_to = route[::-1]
-
 telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
+
+wait = False
 
 
 def send_msg(text):
@@ -138,7 +102,7 @@ def has_tickets(tickets_count):
         seats_count = 0
         for seats in train_tuple[1]['tickets']:
             seats_count += int(seats[1])
-        if seats_count >= tickets_count:
+        if seats_count >= int(tickets_count):
             return True
     return check
 
@@ -173,21 +137,25 @@ async def find_tickets(departure_station, arrival_station, departure_date, train
     url = get_rw_url(departure_station, arrival_station, departure_date)
     trains = await get_webpage(url)
     result = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
-    show_brief_info(result)
+    return show_brief_info(result)
 
 
-def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
-    while True:
+async def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
+    global wait
+    wait = True
+    while wait:
         # with open('departure_date.txt', 'rt') as f:
         #     dep_date_from_file = f.read().strip()
         # if dep_date_from_file:
         #     departure_date = dep_date_from_file
-        find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
-        time.sleep(10)
+        res = await find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
+        await asyncio.sleep(10)
+        print(res)
+        return res
 
 
 async def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-12-10')
+    url = get_rw_url('Минск', 'Витебск', '2024-01-17')
     trains = await get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
@@ -200,6 +168,16 @@ async def test_request():
     # print('show_trains', show_trains(trains))
 
 
-# test_request()
-asyncio.run(test_request())
-# main_loop('Минск', 'Витебск', '2023-11-26')
+async def show_trains(from_, to_, date):
+    url = get_rw_url(from_, to_, date)
+    trains = await get_webpage(url)
+    # print(trains)
+    brief = show_brief_info(trains['trains'])
+    # print(brief)
+    return brief
+
+
+if __name__ == "__main__":
+    asyncio.run(test_request())
+
+    # main_loop('Минск', 'Витебск', '2023-11-26')
