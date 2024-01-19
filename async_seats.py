@@ -11,11 +11,7 @@ from config_setup import config
 telegram_token = config['TELEGRAM_TOKEN']
 my_telegram_id = config['my_telegram_id']
 
-
-# --------------------------------------------------------------
 telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
-
-wait = False
 
 
 def send_msg(text):
@@ -34,14 +30,8 @@ def get_rw_url(from_, to_, date):
     return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
-def check_attribute(tag):
-    if 'data-train-info' in tag.attrs:
-        return True
-
-
 def parse_response(response):
     """
-
     :param response:
     :return: dict 'trains' with keys:
         {
@@ -58,9 +48,6 @@ def parse_response(response):
     trains = {}
     page = bs(response, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
-    # train_table = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
-    # train_blocks = train_table.find_all('div', recursive=False)
-    # train_blocks = filter(check_attribute, train_blocks)
     trains['trains'] = {}
     for train_block in train_blocks:
         train_info = {}
@@ -133,21 +120,20 @@ async def get_webpage(rw_url):
     return trains
 
 
-async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
+async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None, message=None):
     url = get_rw_url(departure_station, arrival_station, departure_date)
     trains = await get_webpage(url)
     result = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
+    print(result)
+    if message and result:
+        print(result)
+        print(show_brief_info(result))
+        await message.answer(show_brief_info(result))
     return show_brief_info(result)
 
 
 async def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
-    global wait
-    wait = True
-    while wait:
-        # with open('departure_date.txt', 'rt') as f:
-        #     dep_date_from_file = f.read().strip()
-        # if dep_date_from_file:
-        #     departure_date = dep_date_from_file
+    while True:
         res = await find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
         await asyncio.sleep(10)
         print(res)
