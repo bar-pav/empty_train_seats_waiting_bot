@@ -1,4 +1,5 @@
 from datetime import datetime
+import sys
 import time
 from bs4 import BeautifulSoup as bs
 import requests
@@ -7,6 +8,8 @@ from config_setup import config
 
 telegram_token = config['TELEGRAM_TOKEN']
 my_telegram_id = config['my_telegram_id']
+
+telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
 
 
 def get_departure_station():
@@ -48,8 +51,6 @@ def get_departure_date():
 # else:
 #     route_from, route_to = route[::-1]
 
-telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
-
 
 def send_msg(text):
     url = telegram_url + text
@@ -79,11 +80,12 @@ def parse_response(response):
     :return: dict 'trains' with keys:
         {
             'trains':
-                {
-                    'route': str,
-                    'time': ('departure', 'arrival', 'duration'),
-                    'tickets': [('name', 'quantity', 'cost'), (...)],
-                },
+                <'train number': str>:
+                    {
+                        'route': str,
+                        'time': ('departure', 'arrival', 'duration'),
+                        'tickets': [('name', 'quantity', 'cost'), (...)],
+                    },
             'empty_seats_count': int,
         }
     """
@@ -98,7 +100,8 @@ def parse_response(response):
     for train_block in train_blocks:
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
-        train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
+        # train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
+        train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().split('\xa0— ')
         train_from_time = train_block.find('div', attrs={'class': 'sch-table__time train-from-time'}).text.strip()
         train_to_time = train_block.find('div', attrs={'class': 'sch-table__time train-to-time'}).text.strip()
         train_duration_time = train_block.find('div', attrs={'class': 'sch-table__duration train-duration-time'}).text.strip()
@@ -182,14 +185,26 @@ def main_loop(departure_station, arrival_station, departure_date, train_number=N
 
 
 def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-11-29')
+    url = get_rw_url('Минск', 'Витебск', '2024-01-17')
     trains = get_webpage(url)
     print(trains)
     print(trains['empty_seats_count'])
     print('Количество поездов = ', len(trains['trains']))
-    print('found_tickets:', show_brief_info(query_tickets(trains, train_number='714Б', tickets_count=2)))
+    print('found_tickets:\n')
+    show_brief_info(query_tickets(trains, train_number=None, tickets_count=1))
     # print('show_trains', show_trains(trains))
 
 
-test_request()
+def show_trains(from_, to_, date):
+    url = get_rw_url(from_, to_, date)
+    trains = get_webpage(url)
+    print(trains)
+    show_brief_info(trains['trains'])
+
+
+if __name__ == "__main__":
+    print(sys.argv[1:])
+    show_trains(*sys.argv[1:])
+
+# test_request()
 # main_loop('Минск', 'Витебск', '2023-11-26')

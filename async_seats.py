@@ -1,4 +1,5 @@
 from datetime import datetime
+from collections import namedtuple
 import time
 from bs4 import BeautifulSoup as bs
 import requests
@@ -11,47 +12,9 @@ from config_setup import config
 telegram_token = config['TELEGRAM_TOKEN']
 my_telegram_id = config['my_telegram_id']
 
-
-def get_departure_station():
-    return input("Введите станцию отправления.").strip()
-
-
-def get_arrival_station():
-    return input("Введите станцию назначения.").strip()
-
-
-route = ('Витебск', 'Минск-Пассажирский')
-# departure_station = get_departure_station()
-# arrival_station = get_arrival_station()
-
-
-# --------------------------------------------------------------
-
-
-def get_departure_date():
-    return input("Введите дату отправления в формате dd.mm.yyyy.").strip()
-
-
-# departure_date = get_departure_date().split('.')
-# departure_date = {
-#     'day': departure_date[0],
-#     'month': departure_date[1],
-#     'year': departure_date[2]
-# }
-#
-# if isinstance(departure_date, dict):
-#     departure_date = f"{departure_date['year']}-{departure_date['month']}-{departure_date['day']}"
-# else:
-#     departure_date = input("Enter departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
-
-# print(f"Enter departure station (1 - Vitebsk) (2 - Minsk):")
-# dep = input("\tStation: ")
-# if dep == '1' or dep == 'Vitebsk':
-#     route_from, route_to = route
-# else:
-#     route_from, route_to = route[::-1]
-
 telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
+
+Train = namedtuple('Train', ['number', 'route', 'time', 'tickets'])
 
 
 def send_msg(text):
@@ -60,24 +23,18 @@ def send_msg(text):
     print(result.json())
 
 
-def test_get_updates_from_bot():
-    url = "https://api.telegram.org/bot" + telegram_token + '/getUpdates'
-    result = requests.get(url)
-    print(result.json())
+# def test_get_updates_from_bot():
+#     url = "https://api.telegram.org/bot" + telegram_token + '/getUpdates'
+#     result = requests.get(url)
+#     print(result.json())
 
 
 def get_rw_url(from_, to_, date):
     return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
-def check_attribute(tag):
-    if 'data-train-info' in tag.attrs:
-        return True
-
-
 def parse_response(response):
     """
-
     :param response:
     :return: dict 'trains' with keys:
         {
@@ -91,22 +48,22 @@ def parse_response(response):
         }
     """
     empty_seats_count = 0
-    trains = {}
+    # trains = {}
+    trains_list = []
     page = bs(response, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
-    # train_table = page.find('div', attrs={'class': 'sch-table__body js-sort-body'})
-    # train_blocks = train_table.find_all('div', recursive=False)
-    # train_blocks = filter(check_attribute, train_blocks)
-    trains['trains'] = {}
+    # trains['trains'] = {}
     for train_block in train_blocks:
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
-        train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
+        # train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
+        train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().split('\xa0— ')
+        train_info['route'] = train_route
         train_from_time = train_block.find('div', attrs={'class': 'sch-table__time train-from-time'}).text.strip()
         train_to_time = train_block.find('div', attrs={'class': 'sch-table__time train-to-time'}).text.strip()
         train_duration_time = train_block.find('div', attrs={'class': 'sch-table__duration train-duration-time'}).text.strip()
-        train_info['route'] = train_route
-        train_info['time'] = (train_from_time, train_to_time, train_duration_time)
+        train_time = (train_from_time, train_to_time, train_duration_time)
+        train_info['time'] = train_time
         tickets = []
         tickets_block = train_block.find('div', attrs={'class': 'sch-table__cell cell-4'})
         if tickets_block:
@@ -117,11 +74,14 @@ def parse_response(response):
                 empty_seats_count += int(ticket_quant)
                 ticket_cost = ticket_info.find('span', attrs={'class': "ticket-cost"}).text.strip()
                 tickets.append((ticket_name, ticket_quant, ticket_cost))
-        train_info['tickets'] = tickets
+        # train_info['tickets'] = tickets
         if train_number:
-            trains['trains'][train_number] = train_info
-    trains['empty_seats_count'] = empty_seats_count
-    return trains
+            # trains['trains'][train_number] = train_info
+            trains_list.append(Train(train_number, train_route, train_time, tickets))
+    # trains['empty_seats_count'] = empty_seats_count
+    print(trains_list)
+    # return trains
+    return trains_list, empty_seats_count
 
 
 def show_brief_info(trains):
@@ -138,7 +98,7 @@ def has_tickets(tickets_count):
         seats_count = 0
         for seats in train_tuple[1]['tickets']:
             seats_count += int(seats[1])
-        if seats_count >= tickets_count:
+        if seats_count >= int(tickets_count):
             return True
     return check
 
@@ -169,29 +129,33 @@ async def get_webpage(rw_url):
     return trains
 
 
-async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
+async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None, message=None):
     url = get_rw_url(departure_station, arrival_station, departure_date)
     trains = await get_webpage(url)
     result = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
-    show_brief_info(result)
+    print(result)
+    if message and result:
+        print(result)
+        print(show_brief_info(result))
+        await message.answer(show_brief_info(result))
+    return show_brief_info(result)
 
 
-def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
+async def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
     while True:
-        # with open('departure_date.txt', 'rt') as f:
-        #     dep_date_from_file = f.read().strip()
-        # if dep_date_from_file:
-        #     departure_date = dep_date_from_file
-        find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
-        time.sleep(10)
+        res = await find_tickets(departure_station, arrival_station, departure_date, train_number, tickets_count)
+        await asyncio.sleep(10)
+        print(res)
+        return res
 
 
 async def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2023-12-10')
-    trains = await get_webpage(url)
+    url = get_rw_url('Минск', 'Витебск', '2024-01-25')
+    trains, seats_count = await get_webpage(url)
     print(trains)
-    print(trains['empty_seats_count'])
-    print('Количество поездов = ', len(trains['trains']))
+    # print(trains['empty_seats_count'])
+    # print('Количество поездов = ', len(trains['trains']))
+    print('Количество поездов = ', len(trains))
     print('found_tickets:')
     t = query_tickets(trains, train_number=None, tickets_count=None)
     print(t)
@@ -200,6 +164,16 @@ async def test_request():
     # print('show_trains', show_trains(trains))
 
 
-# test_request()
-asyncio.run(test_request())
-# main_loop('Минск', 'Витебск', '2023-11-26')
+async def show_trains(from_, to_, date):
+    url = get_rw_url(from_, to_, date)
+    trains = await get_webpage(url)
+    # print(trains)
+    brief = show_brief_info(trains['trains'])
+    # print(brief)
+    return brief
+
+
+if __name__ == "__main__":
+    asyncio.run(test_request())
+
+    # main_loop('Минск', 'Витебск', '2023-11-26')
