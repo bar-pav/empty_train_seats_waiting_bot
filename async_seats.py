@@ -36,27 +36,15 @@ def get_rw_url(from_, to_, date):
 def parse_response(response):
     """
     :param response:
-    :return: dict 'trains' with keys:
-        {
-            'trains':
-                {
-                    'route': str,
-                    'time': ('departure', 'arrival', 'duration'),
-                    'tickets': [('name', 'quantity', 'cost'), (...)],
-                },
-            'empty_seats_count': int,
-        }
+    :return: [namedtuple('Train', ['number', 'route', 'time', 'tickets'])], 'empty_seats_count': int
     """
     empty_seats_count = 0
-    # trains = {}
     trains_list = []
     page = bs(response, features="html.parser")
     train_blocks = page.css.select('div[data-train-info]')
-    # trains['trains'] = {}
     for train_block in train_blocks:
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
-        # train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().replace('\xa0', ' ')
         train_route = train_block.find('span', attrs={'class': 'train-route'}).text.strip().split('\xa0— ')
         train_info['route'] = train_route
         train_from_time = train_block.find('div', attrs={'class': 'sch-table__time train-from-time'}).text.strip()
@@ -74,29 +62,25 @@ def parse_response(response):
                 empty_seats_count += int(ticket_quant)
                 ticket_cost = ticket_info.find('span', attrs={'class': "ticket-cost"}).text.strip()
                 tickets.append((ticket_name, ticket_quant, ticket_cost))
-        # train_info['tickets'] = tickets
         if train_number:
-            # trains['trains'][train_number] = train_info
             trains_list.append(Train(train_number, train_route, train_time, tickets))
-    # trains['empty_seats_count'] = empty_seats_count
-    print(trains_list)
-    # return trains
+    # print(trains_list)
     return trains_list, empty_seats_count
 
 
 def show_brief_info(trains):
     res = ''
-    for train, train_info in trains.items():
-        tickets_count = '\n\t\t'.join([f'{tickets[1]} за {tickets[2]}' for tickets in train_info['tickets']])
-        res += (f'{train} ({train_info["route"]}) {train_info["time"][0]}-{train_info["time"][1]} \n\tБилеты:\n\t\t '
+    for train in trains:
+        tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
+        res += (f'{train.number} ({train.route}) {train.time[0]}-{train.time[1]} \n\tБилеты:\n\t\t'
                 f'{tickets_count}') + '\n'
     return res
 
 
 def has_tickets(tickets_count):
-    def check(train_tuple):
+    def check(trains):
         seats_count = 0
-        for seats in train_tuple[1]['tickets']:
+        for seats in trains.tickets:
             seats_count += int(seats[1])
         if seats_count >= int(tickets_count):
             return True
@@ -104,41 +88,36 @@ def has_tickets(tickets_count):
 
 
 def query_tickets(trains, train_number=None, tickets_count=None):
+    res = None
     if not tickets_count and not train_number:
-        return dict(filter(lambda t: t[1]['tickets'], trains['trains'].items()))
+        res = filter(lambda t: t.tickets, trains)
     if train_number and not tickets_count:
-        return dict(filter(lambda t: t[0] == train_number and t[1]['tickets'], trains['trains'].items()))
+        res = filter(lambda t: t.number == train_number and t.tickets, trains)
     if not train_number and tickets_count:
-        return dict(filter(has_tickets(tickets_count), trains['trains'].items()))
+        res = filter(has_tickets(tickets_count), trains)
     if train_number and tickets_count:
-        return dict(filter(lambda t: t[0] == train_number and has_tickets(tickets_count)(t), trains['trains'].items()))
+        res = filter(lambda t: t.number == train_number and has_tickets(tickets_count)(t), trains)
+    return list(res)
 
 
 async def get_webpage(rw_url):
-    start_response = datetime.now()
-    session = aiohttp.ClientSession()
-    async with session.get(rw_url) as response:
-        if response.status == 200:
-            end_response = datetime.now()
-            trains = parse_response(await response.text())
-            end_parse = datetime.now()
-            print("Full time:", end_parse - start_response, 's')
-            print("\tResponse time:", end_response - start_response, 's')
-            print("\tParse time:", end_parse - end_response, 's')
-    await session.close()
-    return trains
+    async with aiohttp.ClientSession() as session:
+        async with session.get(rw_url) as response:
+            if response.status == 200:
+                return await response.text()
 
 
 async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None, message=None):
     url = get_rw_url(departure_station, arrival_station, departure_date)
-    trains = await get_webpage(url)
-    result = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
-    print(result)
-    if message and result:
-        print(result)
-        print(show_brief_info(result))
-        await message.answer(show_brief_info(result))
-    return show_brief_info(result)
+    page = await get_webpage(url)
+    trains, empty_seats_count = parse_response(page)
+    tickets_filtered = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
+    print(tickets_filtered)
+    if message and tickets_filtered:
+        # print(tickets_filtered)
+        print(show_brief_info(tickets_filtered))
+        await message.answer(show_brief_info(tickets_filtered))
+    return show_brief_info(tickets_filtered)
 
 
 async def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
@@ -151,26 +130,28 @@ async def main_loop(departure_station, arrival_station, departure_date, train_nu
 
 async def test_request():
     url = get_rw_url('Минск', 'Витебск', '2024-01-25')
-    trains, seats_count = await get_webpage(url)
-    print(trains)
-    # print(trains['empty_seats_count'])
-    # print('Количество поездов = ', len(trains['trains']))
-    print('Количество поездов = ', len(trains))
-    print('found_tickets:')
-    t = query_tickets(trains, train_number=None, tickets_count=None)
-    print(t)
-    print(show_brief_info(t))
-    return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
-    # print('show_trains', show_trains(trains))
+    page = await get_webpage(url)
+    if page:
+        trains, seats_count = parse_response(page)
+        print(trains)
+        # print(trains['empty_seats_count'])
+        # print('Количество поездов = ', len(trains['trains']))
+        print('Количество поездов = ', len(trains))
+        print('found_tickets:')
+        t = list(query_tickets(trains, train_number=None, tickets_count=None))
+        print(t)
+        print(show_brief_info(t))
+        # return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
+        # print('show_trains', show_trains(trains))
+    else:
+        print('No page. Check request parameters.')
 
 
 async def show_trains(from_, to_, date):
     url = get_rw_url(from_, to_, date)
-    trains = await get_webpage(url)
-    # print(trains)
-    brief = show_brief_info(trains['trains'])
-    # print(brief)
-    return brief
+    page = await get_webpage(url)
+    trains, _ = parse_response(page)
+    return show_brief_info(trains)
 
 
 if __name__ == "__main__":
