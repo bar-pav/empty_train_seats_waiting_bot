@@ -2,7 +2,8 @@ import asyncio
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command, CommandObject
-from aiogram.
+from aiogram import F
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config_setup import config
 from async_seats import test_request, show_trains, find_tickets
@@ -68,6 +69,23 @@ async def cmd_stop(message: types.Message):
     counter = 0
     print('stopped')
     await message.answer('stopped')
+
+
+@dp.message(Command('inline'))
+async def cmd_inline(message: types.Message):
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(text='get random value', callback_data='random'))
+    await message.answer('Inline kb', reply_markup=kb.as_markup())
+
+
+import random
+
+@dp.callback_query(F.data == 'random')
+async def cmd_random(callback: types.CallbackQuery):
+    kb = InlineKeyboardBuilder()
+    kb.row(types.InlineKeyboardButton(text='get random value', callback_data='random'))
+    await callback.message.edit_text(f'{random.randint(1, 10)}', reply_markup=kb.as_markup())
+    await callback.answer()
 
 
 async def main():
