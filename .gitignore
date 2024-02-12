@@ -1,2 +1,8 @@
 .env
 __pycache__
+my_telegram_token.txt
+my_telegram_id.txt
+Pipfile
+Pipfile.lock
+r.py
+.idea
