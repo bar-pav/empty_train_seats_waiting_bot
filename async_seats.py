@@ -129,7 +129,7 @@ async def main_loop(departure_station, arrival_station, departure_date, train_nu
 
 
 async def test_request():
-    tomorrow = (datetime.now().today() + timedelta(days=1)).strftime('%Y-%m-%d')
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
     url = get_rw_url('Минск', 'Витебск', tomorrow)
     page = await get_webpage(url)
     if page:

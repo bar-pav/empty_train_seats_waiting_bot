@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import random
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandObject, StateFilter
 from aiogram.fsm.state import StatesGroup, State
@@ -18,6 +19,18 @@ INTERVAL = 10
 
 class WaitSeats(StatesGroup):
     wait = State()
+
+
+help_message = """
+    <b>/trains &lt;станция отправления&gt; &lt;станция прибытия&gt; &lt;дата в формате YYYYMMDD&gt;</b> - печатает 
+    список поездов по заданному направлению на указанную дату.\n
+"""
+
+
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    # await message.delete()
+    await message.answer(help_message, parse_mode='html')
 
 
 @dp.message(Command("test"))
@@ -83,9 +96,6 @@ async def cmd_inline(message: types.Message):
     kb = InlineKeyboardBuilder()
     kb.row(types.InlineKeyboardButton(text='get random value', callback_data='random'))
     await message.answer('Inline kb', reply_markup=kb.as_markup())
-
-
-import random
 
 
 @dp.callback_query(F.data == 'random')
