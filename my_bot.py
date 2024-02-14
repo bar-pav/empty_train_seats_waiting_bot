@@ -22,12 +22,18 @@ class WaitSeats(StatesGroup):
 
 
 help_message = """
-    <b>/trains &lt;станция отправления&gt; &lt;станция прибытия&gt; &lt;дата в формате YYYYMMDD&gt;</b> - печатает 
-    список поездов по заданному направлению на указанную дату.\n
+<b>/trains &lt;станция А&gt; &lt;станция Б&gt; &lt;дата YYYYMMDD&gt;</b> - \
+    печатает список поездов по заданному направлению на указанную дату.
+    
+<b>/wait &lt;станция А&gt; &lt;станция Б&gt; &lt;дата YYYYMMDD&gt; &lt;№ поезда&gt; &lt;количество билетов&gt;</b> - \
+    ожидать появление необходимого количества билетов на указанный поезд. При появлении билета придет сообщение.
+    
+<b>/status</b> - выводит статус процесса ожидания.
 """
 
 
 b1 = KeyboardButton(text='/help')
+b2 = KeyboardButton(text='/status')
 kb = ReplyKeyboardBuilder()
 kb.add(b1)
 
@@ -40,7 +46,7 @@ async def cmd_start(message: types.Message):
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
     # await message.delete()
-    await message.answer(help_message, parse_mode='html',)
+    await message.answer(help_message, parse_mode='html', reply_markup=types.ReplyKeyboardRemove())
 
 
 @dp.message(Command("test"))
@@ -67,21 +73,27 @@ async def cmd_wait(message: types.Message, command: CommandObject, state: FSMCon
     """ :arg:  departure_station, arrival_station, departure_date, train_number=None, tickets_count=None"""
 
     await state.set_state(WaitSeats.wait)
-    started = f"Started at {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
+    started = f"Start: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
     status = [started, None, None]
     await state.update_data(wait=True)
     args = command.args.split()
     args[2] = args[2][0:4] + '-' + args[2][4:6] + '-' + args[2][6:8]
     counter = 0
     while (await state.get_data()).get('wait'):
+        """ Обернуть цикл в функцию.
+            Поместить цикл с флагом в словарь (ключ - функция, значение - флаг работы цикла) и добавить словарь в текущее состояние FSM.
+            При появлении нового цикла, он проверяет наличие других циклов и при их наличии переводит их флаги в значение False."""
         # res = await find_tickets(*args, message=message)
         res = await find_tickets(*args)
         # print(res)
+
         counter += 1
-        status[1] = f"Last check at {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
+        status[1] = f"Last check: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
         status[2] = f"Counter: {counter}"
         await state.update_data(status=status)
-        # print(status)
+        if res:
+            print(res)
+            await message.answer(res)
         await asyncio.sleep(INTERVAL)
 
 
@@ -90,8 +102,9 @@ async def cmd_status(message: types.Message, state: FSMContext):
     print(state)
     if (await state.get_state()) == "WaitSeats:wait":
         print((await state.get_data()).get("status"))
-        await message.answer(str((await state.get_data()).get("status")))
-    # await message.answer('\n'.join(status) if status else 'Not started')
+        await message.answer("\n".join((await state.get_data()).get("status")))
+    else:
+        await message.answer('В данный момент поиск билетов не запущен. Запустите командой wait.')
 
 
 @dp.message(WaitSeats.wait, Command("stop"))
