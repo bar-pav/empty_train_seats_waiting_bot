@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandObject, StateFilter
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardMarkup, ReplyKeyboardBuilder, KeyboardButton
 
 from config_setup import config
 from async_seats import test_request, show_trains, find_tickets
@@ -27,10 +27,20 @@ help_message = """
 """
 
 
+b1 = KeyboardButton(text='/help')
+kb = ReplyKeyboardBuilder()
+kb.add(b1)
+
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer('start', reply_markup=kb.as_markup(resize_keyboard=True, one_time_keyboard=True))
+
+
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
     # await message.delete()
-    await message.answer(help_message, parse_mode='html')
+    await message.answer(help_message, parse_mode='html',)
 
 
 @dp.message(Command("test"))
