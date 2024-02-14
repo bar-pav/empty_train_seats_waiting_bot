@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import namedtuple
 import time
 from bs4 import BeautifulSoup as bs
@@ -129,7 +129,8 @@ async def main_loop(departure_station, arrival_station, departure_date, train_nu
 
 
 async def test_request():
-    url = get_rw_url('Минск', 'Витебск', '2024-01-25')
+    tomorrow = (datetime.now().today() + timedelta(days=1)).strftime('%Y-%m-%d')
+    url = get_rw_url('Минск', 'Витебск', tomorrow)
     page = await get_webpage(url)
     if page:
         trains, seats_count = parse_response(page)

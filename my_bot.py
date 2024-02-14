@@ -73,10 +73,6 @@ async def cmd_status(message: types.Message, state: FSMContext):
 
 @dp.message(WaitSeats.wait, Command("stop"))
 async def cmd_stop(message: types.Message, state: FSMContext):
-    # global wait, status, counter
-    wait = False
-    status = None
-    counter = 0
     await state.clear()
     print('stopped')
     await message.answer('stopped')
@@ -90,6 +86,7 @@ async def cmd_inline(message: types.Message):
 
 
 import random
+
 
 @dp.callback_query(F.data == 'random')
 async def cmd_random(callback: types.CallbackQuery):
