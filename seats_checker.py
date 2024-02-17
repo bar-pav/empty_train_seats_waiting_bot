@@ -1,23 +1,38 @@
 from datetime import datetime
 import time
-import requests
 from bs4 import BeautifulSoup as bs
+import requests
+
+from config_setup import config
 
 
-with open('my_telegram_token.txt', 'r') as file:
-    telegram_token = file.read()
+telegram_token = config['TELEGRAM_TOKEN']
+my_telegram_id = config['my_telegram_id']
 
-with open('my_telegram_id.txt', 'r') as file:
-    my_telegram_id = file.read()
+
+def get_departure_station():
+    return input("Введите станцию отправления.").strip()
+
+
+def get_arrival_station():
+    return input("Введите станцию назначения.").strip()
+
 
 route = ('Витебск', 'Минск-Пассажирский')
-
+departure_station = get_departure_station()
+arrival_station = get_arrival_station()
 # --------------------------------------------------------------
-# departure_date = None
+
+
+def get_departure_date():
+    return input("Введите дату отправления в формате dd.mm.yyyy.").strip()
+
+
+departure_date = get_departure_date().split('.')
 departure_date = {
-    'day': '16',
-    'month': '07',
-    'year': '2023'
+    'day': departure_date[0],
+    'month': departure_date[1],
+    'year': departure_date[2]
 }
     
 if isinstance(departure_date, dict):
@@ -35,8 +50,9 @@ else:
 
 telegram_url = "https://api.telegram.org/bot" + telegram_token + '/sendMessage' + '?chat_id=' + my_telegram_id + '&text='
 
-def get_rw_url_for_date(date):
-    return f"https://pass.rw.by/ru/route/?from={route_from}&to={route_to}&date={date}"
+
+def get_rw_url(from_, to_, date):
+    return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
 def send_msg(text):
@@ -106,10 +122,10 @@ def test_get_updates_from_bot():
     print(result.json())
 
 
-def main_loop(departure_date):
+def main_loop(departure_station, arrival_station, departure_date):
     trains = None
     while trains is None:
-        rw_url = get_rw_url_for_date(departure_date)
+        rw_url = get_rw_url(departure_station, arrival_station, departure_date)
         trains = get_list_of_trains(rw_url)
         if trains is None:
             departure_date = input("Enter another departure date in format 'YYYY-MM-DD' (YEAR-MONTH-DAY):\n")
@@ -128,4 +144,4 @@ def main_loop(departure_date):
         time.sleep(10)
 
 
-main_loop(departure_date)
+main_loop(departure_station, arrival_station, departure_date)
