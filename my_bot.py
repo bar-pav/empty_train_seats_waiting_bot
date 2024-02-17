@@ -75,13 +75,16 @@ async def cmd_wait(message: types.Message, command: CommandObject, state: FSMCon
     """ :arg:  departure_station, arrival_station, departure_date, train_number=None, tickets_count=None"""
 
     await state.set_state(WaitSeats.wait)
+    cycles = (await state.get_data()).get('cycles') or set()
+    cycle_id = datetime.now()
+    cycles.add(cycle_id)
+    await state.update_data(cycles=cycles)
     started = f"Start: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
     status = [started, None, None]
-    await state.update_data(wait=True)
     args = command.args.split()
     args[2] = args[2][0:4] + '-' + args[2][4:6] + '-' + args[2][6:8]
     counter = 0
-    while (await state.get_data()).get('wait'):
+    while cycle_id in (await state.get_data()).get('cycles'):
         """ Обернуть цикл в функцию.
             Поместить цикл с флагом в словарь (ключ - функция, значение - флаг работы цикла) и добавить словарь в текущее состояние FSM.
             При появлении нового цикла, он проверяет наличие других циклов и при их наличии переводит их флаги в значение False."""
@@ -97,6 +100,8 @@ async def cmd_wait(message: types.Message, command: CommandObject, state: FSMCon
             print(res)
             await message.answer(res)
         await asyncio.sleep(INTERVAL)
+    else:
+        await message.answer(str(cycle_id) + ' stopped')
 
 
 @dp.message(Command("status"))
@@ -112,6 +117,7 @@ async def cmd_status(message: types.Message, state: FSMContext):
 @dp.message(WaitSeats.wait, Command("stop"))
 async def cmd_stop(message: types.Message, state: FSMContext):
     await state.clear()
+    await state.update_data(cycles=set())
     print('stopped')
     await message.answer('stopped')
 
