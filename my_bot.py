@@ -3,15 +3,14 @@ from datetime import datetime
 import random
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandObject, StateFilter
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardMarkup, ReplyKeyboardBuilder, KeyboardButton
 
 from config_setup import config
-from async_seats import test_request, show_trains, find_tickets
+from async_seats import test_request, trains, find_tickets
 
-
-from time import sleep
 
 bot = Bot(token=config["TELEGRAM_TOKEN"])
 dp = Dispatcher()
@@ -21,6 +20,11 @@ INTERVAL = 10
 
 class WaitSeats(StatesGroup):
     wait = State()
+
+
+class TrainsCallbackFactory(CallbackData, prefix='train'):
+    number: str
+    date: str
 
 
 help_message = """
@@ -53,8 +57,8 @@ async def cmd_help(message: types.Message):
 
 @dp.message(Command("test"))
 async def cmd_start(message: types.Message):
-    # res = await test_request()
-    await message.answer('hello')
+    res = await test_request()
+    # await message.answer('hello')
 
 
 @dp.message(Command("trains"))
@@ -64,10 +68,17 @@ async def cmd_trains(message: types.Message, command: CommandObject):
     """
     print(command.args.split())
     args = command.args.split()
-    args[2] = args[2][0:4] + '-' + args[2][4:6] + '-' + args[2][6:8]
-    print(args)
-    res = await show_trains(*args)
-    await message.answer(res)
+    date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
+    args[2] = date
+    trains_list = await trains(*args)
+    trains_list_str = "\n\n".join(str(train) for train in trains_list)
+    await message.answer(trains_list_str)
+    # ikb_builder = InlineKeyboardBuilder()
+    # for train in trains_list:
+    #     ikb_builder.button(text=f'{train.number}({train.route[0]} - {train.route[1]}\n\tБилеты:\n\t\t{train.tickets})',
+    #                        callback_data=TrainsCallbackFactory(number=train.number, date=date))
+    # ikb_builder.adjust(1)
+    # await message.answer("Trains:", reply_markup=ikb_builder.as_markup())
 
 
 @dp.message(StateFilter(None), Command("wait"))
@@ -88,9 +99,7 @@ async def cmd_wait(message: types.Message, command: CommandObject, state: FSMCon
         """ Обернуть цикл в функцию.
             Поместить цикл с флагом в словарь (ключ - функция, значение - флаг работы цикла) и добавить словарь в текущее состояние FSM.
             При появлении нового цикла, он проверяет наличие других циклов и при их наличии переводит их флаги в значение False."""
-        # res = await find_tickets(*args, message=message)
         res = await find_tickets(*args)
-        # print(res)
 
         counter += 1
         status[1] = f"Last check: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
@@ -122,6 +131,7 @@ async def cmd_stop(message: types.Message, state: FSMContext):
     await message.answer('stopped')
 
 
+# ---------------------------------------------------------------------------
 @dp.message(Command('inline'))
 async def cmd_inline(message: types.Message):
     kb = InlineKeyboardBuilder()
@@ -135,6 +145,7 @@ async def cmd_random(callback: types.CallbackQuery):
     kb.row(types.InlineKeyboardButton(text='get random value', callback_data='random'))
     await callback.message.edit_text(f'{random.randint(1, 10)}', reply_markup=kb.as_markup())
     await callback.answer()
+# ---------------------------------------------------------------------------
 
 
 async def main():

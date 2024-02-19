@@ -68,9 +68,9 @@ def parse_response(response):
     return trains_list, empty_seats_count
 
 
-def show_brief_info(trains):
+def show_brief_info(trains_list):
     res = ''
-    for train in trains:
+    for train in trains_list:
         tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
         res += (f'{train.number} ({train.route}) {train.time[0]}-{train.time[1]} \n\tБилеты:\n\t\t'
                 f'{tickets_count}') + '\n'
@@ -133,13 +133,13 @@ async def test_request():
     url = get_rw_url('Минск', 'Витебск', tomorrow)
     page = await get_webpage(url)
     if page:
-        trains, seats_count = parse_response(page)
-        print(trains)
+        trains_list, seats_count = parse_response(page)
+        print(trains_list)
         # print(trains['empty_seats_count'])
         # print('Количество поездов = ', len(trains['trains']))
-        print('Количество поездов = ', len(trains))
+        print('Количество поездов = ', len(trains_list))
         print('found_tickets:')
-        t = list(query_tickets(trains, train_number=None, tickets_count=None))
+        t = list(query_tickets(trains_list, train_number=None, tickets_count=None))
         print(t)
         print(show_brief_info(t))
         # return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
@@ -148,11 +148,11 @@ async def test_request():
         print('No page. Check request parameters.')
 
 
-async def show_trains(from_, to_, date):
+async def trains(from_, to_, date):
     url = get_rw_url(from_, to_, date)
     page = await get_webpage(url)
-    trains, _ = parse_response(page)
-    return show_brief_info(trains)
+    trains_list, _ = parse_response(page)
+    return trains_list
 
 
 if __name__ == "__main__":
