@@ -82,9 +82,27 @@ async def cmd_trains(message: types.Message, command: CommandObject, state: FSMC
         # ikb_builder.adjust(1)
         # await message.answer("Trains:", reply_markup=ikb_builder.as_markup())
     else:
+        await message.answer("Введите через пробел станцию отправления, станцию прибытия и дату YYYYMMDD:")
         await state.set_state(SearchStates.trains)
-        # await message.answer("<b>/trains &lt;станция А&gt; &lt;станция Б&gt; &lt;дата YYYYMMDD&gt;</b>",
-        #                      parse_mode='html')
+
+
+@dp.message(StateFilter(SearchStates.trains))
+async def trains_state(message: types.Message, state: FSMContext):
+    # await message.answer(message.text)
+    if message.text:
+        args = message.text.split()
+        if len(message.text) == 1 and message.text in ['отмена', 'выход', 'стоп', 'cancel', 'exit', 'stop']:
+            await state.set_state(None)
+            return
+        if len(args) != 3:
+            await message.answer(f"Неверное количество аргументов ({len(args)}).")
+            return
+        date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
+        args[2] = date
+        trains_list = await trains(*args)
+        trains_list_str = "\n\n".join(str(train) for train in trains_list)
+        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_list_str)
+        await state.set_state(None)
 
 
 @dp.message(StateFilter(None), Command("wait"))
