@@ -18,7 +18,8 @@ dp = Dispatcher()
 INTERVAL = 10
 
 
-class WaitSeats(StatesGroup):
+class SearchStates(StatesGroup):
+    trains = State()
     wait = State()
 
 
@@ -61,31 +62,36 @@ async def cmd_start(message: types.Message):
     # await message.answer('hello')
 
 
-@dp.message(Command("trains"))
-async def cmd_trains(message: types.Message, command: CommandObject):
+@dp.message(StateFilter(None), Command("trains"))
+async def cmd_trains(message: types.Message, command: CommandObject, state: FSMContext):
     """
     args = departure_station, arrival_station, departure_date
     """
-    print(command.args.split())
-    args = command.args.split()
-    date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
-    args[2] = date
-    trains_list = await trains(*args)
-    trains_list_str = "\n\n".join(str(train) for train in trains_list)
-    await message.answer(trains_list_str)
-    # ikb_builder = InlineKeyboardBuilder()
-    # for train in trains_list:
-    #     ikb_builder.button(text=f'{train.number}({train.route[0]} - {train.route[1]}\n\tБилеты:\n\t\t{train.tickets})',
-    #                        callback_data=TrainsCallbackFactory(number=train.number, date=date))
-    # ikb_builder.adjust(1)
-    # await message.answer("Trains:", reply_markup=ikb_builder.as_markup())
+    if command.args:
+        print(command.args.split())
+        args = command.args.split()
+        date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
+        args[2] = date
+        trains_list = await trains(*args)
+        trains_list_str = "\n\n".join(str(train) for train in trains_list)
+        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}\n\n" + trains_list_str)
+        # ikb_builder = InlineKeyboardBuilder()
+        # for train in trains_list:
+        #     ikb_builder.button(text=f'{train.number}({train.route[0]} - {train.route[1]}\n\tБилеты:\n\t\t{train.tickets})',
+        #                        callback_data=TrainsCallbackFactory(number=train.number, date=date))
+        # ikb_builder.adjust(1)
+        # await message.answer("Trains:", reply_markup=ikb_builder.as_markup())
+    else:
+        await state.set_state(SearchStates.trains)
+        # await message.answer("<b>/trains &lt;станция А&gt; &lt;станция Б&gt; &lt;дата YYYYMMDD&gt;</b>",
+        #                      parse_mode='html')
 
 
 @dp.message(StateFilter(None), Command("wait"))
 async def cmd_wait(message: types.Message, command: CommandObject, state: FSMContext):
     """ :arg:  departure_station, arrival_station, departure_date, train_number=None, tickets_count=None"""
 
-    await state.set_state(WaitSeats.wait)
+    await state.set_state(SearchStates.wait)
     cycles = (await state.get_data()).get('cycles') or set()
     cycle_id = datetime.now()
     cycles.add(cycle_id)
@@ -123,7 +129,7 @@ async def cmd_status(message: types.Message, state: FSMContext):
         await message.answer('В данный момент поиск билетов не запущен. Запустите командой wait.')
 
 
-@dp.message(WaitSeats.wait, Command("stop"))
+@dp.message(SearchStates.wait, Command("stop"))
 async def cmd_stop(message: types.Message, state: FSMContext):
     await state.clear()
     await state.update_data(cycles=set())
