@@ -52,14 +52,74 @@ async def cmd_start(message: types.Message):
 
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
-    # await message.delete()
     await message.answer(help_message, parse_mode='html', reply_markup=types.ReplyKeyboardRemove())
 
 
-@dp.message(Command("test"))
-async def cmd_start(message: types.Message):
-    res = await test_request()
-    # await message.answer('hello')
+async def check_args(args, message, state):
+    if args:
+        args = args.split()
+        print('args: ', args)
+        if len(args) == 1 and args[0] in ['отмена', 'выход', 'стоп', 'cancel', 'exit', 'stop']:
+            await state.set_state(None)
+            return
+        if len(args) < 3:
+            await message.answer(f"Неверное количество аргументов ({len(args)}).")
+            return
+        return args
+
+
+def format_date(date: str) -> str:
+    return f'{date[0:4]}-{date[4:6]}-{date[6:8]}'
+
+
+async def print_trains(args: str, message: types.Message, state: FSMContext):
+    args = await check_args(args, message, state)
+    if args:
+        date = format_date(args[2])
+        args[2] = date
+        trains_list = await trains(*args)
+        trains_list_str = "\n\n".join(str(train) for train in trains_list)
+        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_list_str)
+    else:
+        await message.answer('Введите через пробел станцию отправления, станцию прибытия и дату YYYYMMDD:')
+
+
+async def start_cycle(args: str, message: types.Message, state: FSMContext):
+    args = await check_args(args, message, state)
+    if args:
+        cycles = (await state.get_data()).get('cycles') or set()
+        cycle_id = str(datetime.now())
+        cycles.add(cycle_id)
+        await state.update_data(cycles=cycles)
+        args[2] = format_date(args[2])
+        await state.set_state(None)
+        while cycle_id in (await state.get_data()).get('cycles'):
+            tickets = await find_tickets(*args)
+            if tickets:
+                print(tickets)
+                await message.answer(tickets)
+            await asyncio.sleep(INTERVAL)
+        else:
+            await message.answer(str(cycle_id) + ' stopped')
+    else:
+        await message.answer("Введите через пробел станцию отправления, станцию прибытия, дату YYYYMMDD, номер поезда и количество билетов:")
+
+
+@dp.message(Command("status"))
+async def cmd_status(message: types.Message, state: FSMContext):
+    current_state = str(await state.get_state())
+    if (await state.get_data()).get('cycles'):
+        await message.answer(f"{current_state}\nЗапущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles')))
+    else:
+        await message.answer(f"{current_state}\nНет запущенных циклов.")
+
+
+@dp.message(Command("stop"))
+async def cmd_stop(message: types.Message, state: FSMContext):
+    await state.clear()
+    await state.update_data(cycles=set())
+    print('Stopped')
+    await message.answer('Stopped')
 
 
 @dp.message(StateFilter(None), Command("trains"))
@@ -67,95 +127,30 @@ async def cmd_trains(message: types.Message, command: CommandObject, state: FSMC
     """
     args = departure_station, arrival_station, departure_date
     """
-    if command.args:
-        print(command.args.split())
-        args = command.args.split()
-        date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
-        args[2] = date
-        trains_list = await trains(*args)
-        trains_list_str = "\n\n".join(str(train) for train in trains_list)
-        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}\n\n" + trains_list_str)
-        # ikb_builder = InlineKeyboardBuilder()
-        # for train in trains_list:
-        #     ikb_builder.button(text=f'{train.number}({train.route[0]} - {train.route[1]}\n\tБилеты:\n\t\t{train.tickets})',
-        #                        callback_data=TrainsCallbackFactory(number=train.number, date=date))
-        # ikb_builder.adjust(1)
-        # await message.answer("Trains:", reply_markup=ikb_builder.as_markup())
-    else:
-        await message.answer("Введите через пробел станцию отправления, станцию прибытия и дату YYYYMMDD:")
-        await state.set_state(SearchStates.trains)
+    await state.set_state(SearchStates.trains)
+    await print_trains(command.args, message, state)
 
 
 @dp.message(StateFilter(SearchStates.trains))
 async def trains_state(message: types.Message, state: FSMContext):
-    # await message.answer(message.text)
-    if message.text:
-        args = message.text.split()
-        if len(message.text) == 1 and message.text in ['отмена', 'выход', 'стоп', 'cancel', 'exit', 'stop']:
-            await state.set_state(None)
-            return
-        if len(args) != 3:
-            await message.answer(f"Неверное количество аргументов ({len(args)}).")
-            return
-        date = f'{args[2][0:4]}-{args[2][4:6]}-{args[2][6:8]}'
-        args[2] = date
-        trains_list = await trains(*args)
-        trains_list_str = "\n\n".join(str(train) for train in trains_list)
-        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_list_str)
-        await state.set_state(None)
+    await print_trains(message.text, message, state)
+    await state.set_state(None)
 
 
 @dp.message(StateFilter(None), Command("wait"))
 async def cmd_wait(message: types.Message, command: CommandObject, state: FSMContext):
     """ :arg:  departure_station, arrival_station, departure_date, train_number=None, tickets_count=None"""
-
     await state.set_state(SearchStates.wait)
-    cycles = (await state.get_data()).get('cycles') or set()
-    cycle_id = datetime.now()
-    cycles.add(cycle_id)
-    await state.update_data(cycles=cycles)
-    started = f"Start: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
-    status = [started, None, None]
-    args = command.args.split()
-    args[2] = args[2][0:4] + '-' + args[2][4:6] + '-' + args[2][6:8]
-    counter = 0
-    while cycle_id in (await state.get_data()).get('cycles'):
-        """ Обернуть цикл в функцию.
-            Поместить цикл с флагом в словарь (ключ - функция, значение - флаг работы цикла) и добавить словарь в текущее состояние FSM.
-            При появлении нового цикла, он проверяет наличие других циклов и при их наличии переводит их флаги в значение False."""
-        res = await find_tickets(*args)
-
-        counter += 1
-        status[1] = f"Last check: {datetime.now().strftime('%H:%M:%S, %d.%m.%Y')}"
-        status[2] = f"Counter: {counter}"
-        await state.update_data(status=status)
-        if res:
-            print(res)
-            await message.answer(res)
-        await asyncio.sleep(INTERVAL)
-    else:
-        await message.answer(str(cycle_id) + ' stopped')
+    await start_cycle(command.args, message, state)
 
 
-@dp.message(Command("status"))
-async def cmd_status(message: types.Message, state: FSMContext):
-    print(state)
-    if (await state.get_state()) == "WaitSeats:wait":
-        print((await state.get_data()).get("status"))
-        await message.answer("\n".join((await state.get_data()).get("status")))
-    else:
-        await message.answer('В данный момент поиск билетов не запущен. Запустите командой wait.')
+@dp.message(StateFilter(SearchStates.wait))
+async def wait_state(message: types.Message, state: FSMContext):
+    await start_cycle(message.text, message, state)
 
 
-@dp.message(SearchStates.wait, Command("stop"))
-async def cmd_stop(message: types.Message, state: FSMContext):
-    await state.clear()
-    await state.update_data(cycles=set())
-    print('stopped')
-    await message.answer('stopped')
 
-
-# ---------------------------------------------------------------------------
+# ------------------------------------------TEST---------------------------------
 @dp.message(Command('inline'))
 async def cmd_inline(message: types.Message):
     kb = InlineKeyboardBuilder()
