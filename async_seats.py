@@ -1,9 +1,7 @@
 from datetime import datetime, timedelta
 from collections import namedtuple
-import time
 from bs4 import BeautifulSoup as bs
 import requests
-
 import asyncio
 import aiohttp
 
@@ -33,15 +31,15 @@ def get_rw_url(from_, to_, date):
     return f"https://pass.rw.by/ru/route/?from={from_}&to={to_}&date={date}"
 
 
-def parse_response(response):
+def parse_response(page):
     """
-    :param response:
+    :param page:
     :return: [namedtuple('Train', ['number', 'route', 'time', 'tickets'])], 'empty_seats_count': int
     """
     empty_seats_count = 0
     trains_list = []
-    page = bs(response, features="html.parser")
-    train_blocks = page.css.select('div[data-train-info]')
+    page_bs = bs(page, features="html.parser")
+    train_blocks = page_bs.css.select('div[data-train-info]')
     for train_block in train_blocks:
         train_info = {}
         train_number = train_block.find('span', attrs={'class': 'train-number'}).text.strip()
@@ -78,9 +76,9 @@ def show_brief_info(trains_list):
 
 
 def has_tickets(tickets_count):
-    def check(trains):
+    def check(train):
         seats_count = 0
-        for seats in trains.tickets:
+        for seats in train.tickets:
             seats_count += int(seats[1])
         if seats_count >= int(tickets_count):
             return True
@@ -101,10 +99,13 @@ def query_tickets(trains, train_number=None, tickets_count=None):
 
 
 async def get_webpage(rw_url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(rw_url) as response:
-            if response.status == 200:
-                return await response.text()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(rw_url) as response:
+                if response.status == 200:
+                    return await response.text()
+    except aiohttp.ClientConnectionError:
+        return ''
 
 
 async def find_tickets(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None, message=None):

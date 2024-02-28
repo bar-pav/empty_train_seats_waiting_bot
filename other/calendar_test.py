@@ -2,11 +2,14 @@ import calendar
 
 import datetime
 
+import logging
+
 
 # print([datetime.date(2001, 1, i+1).strftime('%A') for i in range(7)])
 # print([datetime.date(2001, 1, i+1).strftime('%a') for i in range(7)])
 # print([datetime.date(2001, 1, i+1).strftime('%B') for i in range(7)])
 
+logging.basicConfig(level=logging.DEBUG)
 
 cal = calendar.Calendar(0)
 start = datetime.datetime.now()

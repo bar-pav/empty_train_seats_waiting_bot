@@ -1,18 +1,21 @@
 import asyncio
 from datetime import datetime
+import logging
 import random
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandObject, StateFilter
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardMarkup, ReplyKeyboardBuilder, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder, KeyboardButton
 
 from config_setup import config
-from async_seats import test_request, trains, find_tickets
+from async_seats import trains, find_tickets
 
 
 bot = Bot(token=config["TELEGRAM_TOKEN"])
+bot.delete_webhook(drop_pending_updates=True)
+
 dp = Dispatcher()
 
 INTERVAL = 10
@@ -93,21 +96,24 @@ async def start_cycle(args: str, message: types.Message, state: FSMContext):
         await state.update_data(cycles=cycles)
         args[2] = format_date(args[2])
         await state.set_state(None)
-        while cycle_id in (await state.get_data()).get('cycles'):
-            tickets = await find_tickets(*args)
-            if tickets:
-                print(tickets)
-                await message.answer(tickets)
-            await asyncio.sleep(INTERVAL)
-        else:
-            await message.answer(str(cycle_id) + ' stopped')
+        try:
+            while cycle_id in (await state.get_data()).get('cycles'):
+                tickets = await find_tickets(*args)
+                if tickets:
+                    print(tickets)
+                    await message.answer(tickets)
+                await asyncio.sleep(INTERVAL)
+            else:
+                await message.answer(str(cycle_id) + ' stopped')
+        except:
+            print("EXCEPTION IN WAIT CYCLE.")
     else:
         await message.answer("Введите через пробел станцию отправления, станцию прибытия, дату YYYYMMDD, номер поезда и количество билетов:")
 
 
 @dp.message(Command("status"))
 async def cmd_status(message: types.Message, state: FSMContext):
-    current_state = str(await state.get_state())
+    current_state = str((await state.get_state()) or '')
     if (await state.get_data()).get('cycles'):
         await message.answer(f"{current_state}\nЗапущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles')))
     else:
@@ -170,5 +176,8 @@ async def cmd_random(callback: types.CallbackQuery):
 async def main():
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
     asyncio.run(main())
