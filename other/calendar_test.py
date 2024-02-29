@@ -46,6 +46,14 @@ def one_month_offset(year, month, offset):
     return year, month
 
 
+def next_month(year, month):
+    return one_month_offset(year, month, 1)
+
+
+def prev_month(year, month):
+    return one_month_offset(year, month, -1)
+
+
 print_month_calendar(*one_month_offset(2024, 1, -1))
 print_month_calendar(2024,1)
 print_month_calendar(2024,2)

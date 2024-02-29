@@ -70,7 +70,8 @@ def show_brief_info(trains_list):
     res = ''
     for train in trains_list:
         tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
-        res += (f'{train.number} ({train.route}) {train.time[0]}-{train.time[1]} \n\tБилеты:\n\t\t'
+        res += (f'{train.number}: {train.route[0]} - {train.route[1]}\
+                  ({train.time[0]}-{train.time[1]}) \n\tБилеты:\n\t\t'
                 f'{tickets_count}') + '\n'
     return res
 
@@ -115,9 +116,8 @@ async def find_tickets(departure_station, arrival_station, departure_date, train
     tickets_filtered = query_tickets(trains, train_number=train_number, tickets_count=tickets_count)
     print(tickets_filtered)
     if message and tickets_filtered:
-        # print(tickets_filtered)
         print(show_brief_info(tickets_filtered))
-        await message.answer(show_brief_info(tickets_filtered))
+        # await message.answer(show_brief_info(tickets_filtered)) # FIXME Uncomment.
     return show_brief_info(tickets_filtered)
 
 

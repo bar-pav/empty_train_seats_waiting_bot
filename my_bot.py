@@ -14,7 +14,7 @@ from async_seats import trains, find_tickets
 
 
 bot = Bot(token=config["TELEGRAM_TOKEN"])
-bot.delete_webhook(drop_pending_updates=True)
+# bot.delete_webhook(drop_pending_updates=True)
 
 dp = Dispatcher()
 
@@ -83,6 +83,7 @@ async def print_trains(args: str, message: types.Message, state: FSMContext):
         trains_list = await trains(*args)
         trains_list_str = "\n\n".join(str(train) for train in trains_list)
         await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_list_str)
+        await state.set_state(None)
     else:
         await message.answer('Введите через пробел станцию отправления, станцию прибытия и дату YYYYMMDD:')
 
@@ -90,23 +91,29 @@ async def print_trains(args: str, message: types.Message, state: FSMContext):
 async def start_cycle(args: str, message: types.Message, state: FSMContext):
     args = await check_args(args, message, state)
     if args:
-        cycles = (await state.get_data()).get('cycles') or set()
+        cycle_count = 0
+
+        cycles = (await state.get_data()).get('cycles') or {}
         cycle_id = str(datetime.now())
-        cycles.add(cycle_id)
+        cycles[cycle_id] = f'{args[2]}:{args[0].capitalize()} - {args[1].capitalize()}:{args[3]}(count: {cycle_count})'
+
         await state.update_data(cycles=cycles)
         args[2] = format_date(args[2])
         await state.set_state(None)
-        try:
-            while cycle_id in (await state.get_data()).get('cycles'):
+        while cycle_id in (await state.get_data()).get('cycles'):
+            try:
                 tickets = await find_tickets(*args)
                 if tickets:
                     print(tickets)
                     await message.answer(tickets)
+                cycle_count += 1
+                cycles[cycle_id] = f'{args[2]}:{args[0].capitalize()} - {args[1].capitalize()}:{args[3]}(count: {cycle_count})'
+                await state.update_data(cycles=cycles)
                 await asyncio.sleep(INTERVAL)
-            else:
-                await message.answer(str(cycle_id) + ' stopped')
-        except:
-            print("EXCEPTION IN WAIT CYCLE.")
+            except Exception as e:
+                print(f"EXCEPTION IN WAIT CYCLE. \n{e}")
+        else:
+            await message.answer(str(cycle_id) + ' stopped')
     else:
         await message.answer("Введите через пробел станцию отправления, станцию прибытия, дату YYYYMMDD, номер поезда и количество билетов:")
 
@@ -115,15 +122,15 @@ async def start_cycle(args: str, message: types.Message, state: FSMContext):
 async def cmd_status(message: types.Message, state: FSMContext):
     current_state = str((await state.get_state()) or '')
     if (await state.get_data()).get('cycles'):
-        await message.answer(f"{current_state}\nЗапущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles')))
+        await message.answer(f"{current_state}\nЗапущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles').values()))
     else:
         await message.answer(f"{current_state}\nНет запущенных циклов.")
 
 
 @dp.message(Command("stop"))
 async def cmd_stop(message: types.Message, state: FSMContext):
-    await state.clear()
-    await state.update_data(cycles=set())
+    await state.set_state(None)
+    await state.update_data(cycles={})
     print('Stopped')
     await message.answer('Stopped')
 
@@ -140,7 +147,6 @@ async def cmd_trains(message: types.Message, command: CommandObject, state: FSMC
 @dp.message(StateFilter(SearchStates.trains))
 async def trains_state(message: types.Message, state: FSMContext):
     await print_trains(message.text, message, state)
-    await state.set_state(None)
 
 
 @dp.message(StateFilter(None), Command("wait"))
