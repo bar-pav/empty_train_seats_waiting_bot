@@ -10,12 +10,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder, KeyboardButton
 
 from config_setup import config
-from async_seats import trains, find_tickets
+from async_seats import get_trains, find_tickets, trains_brief_info
 
 
-bot = Bot(token=config["TELEGRAM_TOKEN"])
-# bot.delete_webhook(drop_pending_updates=True)
-
+bot = Bot(token=config["TELEGRAM_TOKEN"], parse_mode='html')
 dp = Dispatcher()
 
 INTERVAL = 10
@@ -39,6 +37,10 @@ help_message = """
     ожидать появление необходимого количества билетов на указанный поезд. При появлении билета придет сообщение.
     
 <b>/status</b> - выводит статус процесса ожидания.
+
+<b>/stop</b> - отстанавливает все запущенные поискибилетовю.
+
+<b>/help</b> - печатает данное сообщение. 
 """
 
 
@@ -50,12 +52,12 @@ kb.add(b1)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer('start', reply_markup=kb.as_markup(resize_keyboard=True, one_time_keyboard=True))
+    await message.answer(text='🚂', reply_markup=kb.as_markup(resize_keyboard=True, one_time_keyboard=True))
 
 
 @dp.message(Command("help"))
 async def cmd_help(message: types.Message):
-    await message.answer(help_message, parse_mode='html', reply_markup=types.ReplyKeyboardRemove())
+    await message.answer(help_message, reply_markup=types.ReplyKeyboardRemove())
 
 
 async def check_args(args, message, state):
@@ -80,9 +82,9 @@ async def print_trains(args: str, message: types.Message, state: FSMContext):
     if args:
         date = format_date(args[2])
         args[2] = date
-        trains_list = await trains(*args)
+        trains_list = await get_trains(*args)
         trains_list_str = "\n\n".join(str(train) for train in trains_list)
-        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_list_str)
+        await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_brief_info(trains_list))
         await state.set_state(None)
     else:
         await message.answer('Введите через пробел станцию отправления, станцию прибытия и дату YYYYMMDD:')
@@ -107,7 +109,8 @@ async def start_cycle(args: str, message: types.Message, state: FSMContext):
                     print(tickets)
                     await message.answer(tickets)
                 cycle_count += 1
-                cycles[cycle_id] = f'{args[2]}:{args[0].capitalize()} - {args[1].capitalize()}:{args[3]}(count: {cycle_count})'
+                cycles[cycle_id] = (f'{args[2]}:{args[0].capitalize()} - {args[1].capitalize()}:'
+                                    f'{args[3]}(count: {cycle_count})')
                 await state.update_data(cycles=cycles)
                 await asyncio.sleep(INTERVAL)
             except Exception as e:
@@ -115,7 +118,7 @@ async def start_cycle(args: str, message: types.Message, state: FSMContext):
         else:
             await message.answer(str(cycle_id) + ' stopped')
     else:
-        await message.answer("Введите через пробел станцию отправления, станцию прибытия, дату YYYYMMDD, номер поезда и количество билетов:")
+        await message.answer("Введите <b>станцию отправления</b> <b>станцию прибытия</b> <b>дату YYYYMMDD</b> <b>номер поезда</b> <b>количество билетов</b>")
 
 
 @dp.message(Command("status"))
@@ -161,7 +164,6 @@ async def wait_state(message: types.Message, state: FSMContext):
     await start_cycle(message.text, message, state)
 
 
-
 # ------------------------------------------TEST---------------------------------
 @dp.message(Command('inline'))
 async def cmd_inline(message: types.Message):
@@ -179,11 +181,15 @@ async def cmd_random(callback: types.CallbackQuery):
 # ---------------------------------------------------------------------------
 
 
+async def on_startup(dispatcher):
+    print('Bot started.' + ' dispatcher: ' + str(dispatcher))
+
+
 async def main():
+    dp.startup.register(on_startup)
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
