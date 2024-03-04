@@ -88,7 +88,7 @@ def trains_brief_info(trains) -> str:
     for train in trains:
         tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
         res += (f'<b>{train.number}</b>: {train.route[0]} - {train.route[1]}({train.time[0]}-{train.time[1]}) ' +
-                (f'\n\tБилеты:\n\t\t{tickets_count}' + '\n\n') if tickets_count else "Билетов нет.")  # FIXME
+                ((f'\n\tБилеты:\n\t\t{tickets_count}' + '\n\n') if tickets_count else "<b>\tБилетов нет.\n\n</b>"))
     return res
 
 
