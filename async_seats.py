@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from collections import namedtuple
 from bs4 import BeautifulSoup as bs
 import asyncio
@@ -52,16 +51,6 @@ def parse_response(page):
     return trains_list, empty_seats_count
 
 
-def trains_brief_info(trains) -> str:
-    res = ''
-    for train in trains:
-        tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
-        res += (f'<b>{train.number}</b>: {train.route[0]} - {train.route[1]}({train.time[0]}-{train.time[1]}) '
-                f'\n\tБилеты:\n\t\t'
-                f'{tickets_count}') + '\n\n'
-    return res
-
-
 def has_tickets(tickets_count):
     def check(train):
         seats_count = 0
@@ -94,21 +83,32 @@ async def get_webpage(rw_url):
         return ''
 
 
+def trains_brief_info(trains) -> str:
+    res = ''
+    for train in trains:
+        tickets_count = '\n\t\t'.join([f'{tickets[1]} по {tickets[2]}' for tickets in train.tickets])
+        res += (f'<b>{train.number}</b>: {train.route[0]} - {train.route[1]}({train.time[0]}-{train.time[1]}) ' +
+                (f'\n\tБилеты:\n\t\t{tickets_count}' + '\n\n') if tickets_count else "Билетов нет.")  # FIXME
+    return res
+
+
 async def find_tickets(departure_station,
                        arrival_station,
                        departure_date,
                        train_number=None,
-                       tickets_count=None,
-                       message=None):
+                       tickets_count=None):
     url = get_rw_url(departure_station, arrival_station, departure_date)
     page = await get_webpage(url)
     trains, empty_seats_count = parse_response(page)
     tickets_filtered = filter_tickets(trains, train_number=train_number, tickets_count=tickets_count)
-    # print(tickets_filtered)
-    # if message and tickets_filtered:
-    #     print(trains_brief_info(tickets_filtered))
-    #     # await message.answer(show_brief_info(tickets_filtered))
     return trains_brief_info(tickets_filtered)
+
+
+async def get_trains(from_, to_, date):
+    url = get_rw_url(from_, to_, date)
+    page = await get_webpage(url)
+    trains, _ = parse_response(page)
+    return trains
 
 
 async def main_loop(departure_station, arrival_station, departure_date, train_number=None, tickets_count=None):
@@ -119,34 +119,6 @@ async def main_loop(departure_station, arrival_station, departure_date, train_nu
         return res
 
 
-async def test_request():
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-    url = get_rw_url('Минск', 'Витебск', tomorrow)
-    page = await get_webpage(url)
-    if page:
-        trains, seats_count = parse_response(page)
-        print(trains)
-        # print(trains['empty_seats_count'])
-        # print('Количество поездов = ', len(trains['trains']))
-        print('Количество поездов = ', len(trains))
-        print('found_tickets:')
-        t = list(filter_tickets(trains, train_number=None, tickets_count=None))
-        print(t)
-        print(trains_brief_info(t))
-        # return show_brief_info(query_tickets(trains, train_number=None, tickets_count=None))
-        # print('show_trains', show_trains(trains))
-    else:
-        print('No page. Check request parameters.')
-
-
-async def get_trains(from_, to_, date):
-    url = get_rw_url(from_, to_, date)
-    page = await get_webpage(url)
-    trains, _ = parse_response(page)
-    return trains
-
-
 if __name__ == "__main__":
-    asyncio.run(test_request())
-
+    pass
     # main_loop('Минск', 'Витебск', '2023-11-26')

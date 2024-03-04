@@ -52,7 +52,7 @@ kb.add(b1)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer(text='🚂', reply_markup=kb.as_markup(resize_keyboard=True, one_time_keyboard=True))
+    await message.answer(text=chr(128642), reply_markup=kb.as_markup(resize_keyboard=True, one_time_keyboard=True))
 
 
 @dp.message(Command("help"))
@@ -83,7 +83,7 @@ async def print_trains(args: str, message: types.Message, state: FSMContext):
         date = format_date(args[2])
         args[2] = date
         trains_list = await get_trains(*args)
-        trains_list_str = "\n\n".join(str(train) for train in trains_list)
+        # trains_list_str = "\n\n".join(str(train) for train in trains_list)
         await message.answer(f"{args[0].capitalize()} - {args[1].capitalize()}:\n\n" + trains_brief_info(trains_list))
         await state.set_state(None)
     else:
@@ -123,11 +123,10 @@ async def start_cycle(args: str, message: types.Message, state: FSMContext):
 
 @dp.message(Command("status"))
 async def cmd_status(message: types.Message, state: FSMContext):
-    current_state = str((await state.get_state()) or '')
     if (await state.get_data()).get('cycles'):
-        await message.answer(f"{current_state}\nЗапущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles').values()))
+        await message.answer(f"Запущенные циклы: \n" + '\n'.join((await state.get_data()).get('cycles').values()))
     else:
-        await message.answer(f"{current_state}\nНет запущенных циклов.")
+        await message.answer(f"Нет запущенных циклов.")
 
 
 @dp.message(Command("stop"))
